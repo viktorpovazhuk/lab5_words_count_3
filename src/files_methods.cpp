@@ -3,31 +3,35 @@
 //
 
 #include "files_methods.h"
-
 #include "ReadFile.h"
 
-using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
+#include <oneapi/tbb/concurrent_queue.h>
 
-void findFiles(string &filesDirectory, ThreadSafeQueue<fs::path> &paths) {
+using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
+using BoundedPathQueue = oneapi::tbb::concurrent_bounded_queue<fs::path>;
+using BoundedRFQueue = oneapi::tbb::concurrent_bounded_queue<ReadFile>;
+
+void findFiles(std::string &filesDirectory, BoundedPathQueue &paths) {
     for (const auto &dir_entry: fs::recursive_directory_iterator(filesDirectory)) {
         if (dir_entry.path().extension() == ".zip" || dir_entry.path().extension() == ".txt") {
-            paths.enque(dir_entry.path());
+            paths.push(dir_entry.path());
         }
     }
-    paths.enque(fs::path(""));
+    paths.push(fs::path(""));
 }
 
-void readFiles(ThreadSafeQueue<fs::path> &paths, ThreadSafeQueue<ReadFile> &filesContents, std::uintmax_t maxFileSize, TimePoint &timeReadingFinish) {
-    auto path = paths.deque();
+void readFiles(BoundedPathQueue &paths, BoundedRFQueue &filesContents, std::uintmax_t maxFileSize, TimePoint &timeReadingFinish) {
+    fs::path path;
+    paths.pop(path);
     while (path != fs::path("")) {
         if (fs::file_size(path) >= maxFileSize){
-            path = paths.deque();
+            paths.pop(path);
             continue;
         }
         ReadFile readFile;
         if (path.extension() == ".txt") {
             std::ifstream ifs(path);
-            string content{(std::istreambuf_iterator<char>(ifs)),
+            std::string content{(std::istreambuf_iterator<char>(ifs)),
                            (std::istreambuf_iterator<char>())};
             readFile.content = std::move(content);
         }
@@ -40,12 +44,12 @@ void readFiles(ThreadSafeQueue<fs::path> &paths, ThreadSafeQueue<ReadFile> &file
         }
         readFile.extension = path.extension();
         readFile.filename = path.filename();
-        filesContents.enque(std::move(readFile));
-        path = paths.deque();
+        filesContents.push(std::move(readFile));
+        paths.pop(path);
     }
     ReadFile emptyReadFile;
-    filesContents.enque(emptyReadFile);
-    paths.enque(fs::path(""));
+    filesContents.push(std::move(emptyReadFile));
+    paths.push(fs::path(""));
 
     timeReadingFinish = get_current_time_fenced();
 }

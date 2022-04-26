@@ -51,7 +51,7 @@ set(ENABLE_MSAN OFF)
 
 #! Be default -- build release version if not specified otherwise.
 if (NOT CMAKE_BUILD_TYPE)
-	set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release)
 endif ()
 
 # Warnings as errors should be imported here -- do not move this line
@@ -63,12 +63,12 @@ include(cmake/CompilerWarnings.cmake)
 
 #! Project main executable source compilation
 add_executable(${PROJECT_NAME} src/main.cpp
-		src/options_parser.cpp src/options_parser.h
-		src/thread_safe_queue.h
-		src/time_measurement.h src/files_methods.h src/files_methods.cpp
-		src/write_in_file.h src/write_in_file.cpp
-		src/thread_functions.h src/thread_functions.cpp
-		src/errors.h src/ReadFile.h)
+        src/options_parser.cpp src/options_parser.h
+        src/thread_safe_queue.h
+        src/time_measurement.h src/files_methods.h src/files_methods.cpp
+        src/write_in_file.h src/write_in_file.cpp
+        src/thread_functions.h src/thread_functions.cpp
+        src/errors.h src/ReadFile.h src/StringHashCompare.h)
 
 add_executable(${TEST_EXECUTABLE} examples/tbb_counttick.cpp)
 
@@ -83,25 +83,27 @@ target_include_directories(${TEST_EXECUTABLE} PRIVATE ${Boost_INCLUDE_DIR})
 target_link_libraries(${TEST_EXECUTABLE} Boost::program_options Boost::system)
 
 # Add OneTBB lib
-find_package(TBB REQUIRED)
+find_package(TBB COMPONENTS tbb tbbmalloc REQUIRED)
 
-if( NOT TBB_FOUND )
-	message( FATAL_ERROR "Cannot find boost!" )
-endif( NOT TBB_FOUND )
+if (NOT TBB_FOUND)
+    message(FATAL_ERROR "Cannot find TBB!")
+endif (NOT TBB_FOUND)
 
 message(STATUS "TBB found")
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${TBB_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} TBB::tbb TBB::tbbmalloc)
 
-target_link_libraries(${PROJECT_NAME} TBB::tbb)
+target_include_directories(${TEST_EXECUTABLE} PRIVATE ${TBB_INCLUDE_DIRS})
+target_link_libraries(${TEST_EXECUTABLE} TBB::tbb TBB::tbbmalloc)
 
 ##########################################################
 # Fixed CMakeLists.txt part
 ##########################################################
 
 INSTALL(PROGRAMS
-		$<TARGET_FILE:${PROJECT_NAME}> # ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}
-		DESTINATION bin)
+        $<TARGET_FILE:${PROJECT_NAME}> # ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}
+        DESTINATION bin)
 
 # Define ALL_TARGETS variable to use in PVS and Sanitizers
 set(ALL_TARGETS ${PROJECT_NAME})

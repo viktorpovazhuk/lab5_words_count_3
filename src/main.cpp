@@ -6,11 +6,14 @@
 #include "time_measurement.h"
 #include "thread_safe_queue.h"
 #include "ReadFile.h"
+#include "StringHashCompare.h"
 
 #include <iostream>
 #include <filesystem>
 #include <string>
 #include <fstream>
+#include <oneapi/tbb/concurrent_queue.h>
+#include <oneapi/tbb/concurrent_hash_map.h>
 
 namespace fs = std::filesystem;
 
@@ -20,16 +23,21 @@ using std::cerr;
 using std::endl;
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
-using mapStrInt = std::map<std::string, int>;
+using MapStrInt = std::map<std::string, int>;
+using BoundedPathQueue = oneapi::tbb::concurrent_bounded_queue<fs::path>;
+using BoundedRFQueue = oneapi::tbb::concurrent_bounded_queue<ReadFile>;
+using BoundedMapQueue = oneapi::tbb::concurrent_bounded_queue<MapStrInt>;
+using StringTable = oneapi::tbb::concurrent_hash_map<string, int, StringHashCompare>;
 
 //#define PRINT_CONTENT
 #define PARALLEL
 
 void
-startIndexingThreads(int numberOfThreads, std::vector<std::thread> &threads, ThreadSafeQueue<ReadFile> &filesContents,
-                     TimePoint &timeIndexingFinish);
+startIndexingThreads(int numberOfThreads, std::vector<std::thread> &threads, BoundedRFQueue &filesContents,
+                     BoundedMapQueue &dicts, int &numOfWorkingIndexers,
+                     std::mutex &numOfWorkingIndexersMutex, TimePoint &timeIndexingFinish);
 
-void startMergingThreads(int numberOfThreads, std::vector<std::thread> &threads, ThreadSafeQueue<mapStrInt> &dicts,
+void startMergingThreads(int numberOfThreads, std::vector<std::thread> &threads, StringTable &globalDict, BoundedMapQueue &dicts,
                          TimePoint &timeMergingFinish);
 
 
@@ -90,17 +98,19 @@ int main(int argc, char *argv[]) {
     auto timeStart = get_current_time_fenced();
     TimePoint timeIndexingFinish, timeMergingFinish, timeReadingFinish, timeWritingFinish;
 
-    ThreadSafeQueue<fs::path> paths;
-    paths.setMaxElements(maxFilenamesQSize);
-    ThreadSafeQueue<ReadFile> filesContents;
-    filesContents.setMaxElements(maxRawFilesQSize);
-    ThreadSafeQueue<mapStrInt> filesDicts;
-    filesDicts.setMaxElements(maxDictionariesQSize);
+    BoundedPathQueue paths;
+    paths.set_capacity(maxFilenamesQSize);
+    BoundedRFQueue filesContents;
+    filesContents.set_capacity(maxRawFilesQSize);
+    BoundedMapQueue dicts;
+    dicts.set_capacity(maxDictionariesQSize);
 
     std::vector<std::thread> indexingThreads;
     indexingThreads.reserve(numberOfIndexingThreads);
     std::vector<std::thread> mergingThreads;
     mergingThreads.reserve(numberOfMergingThreads);
+
+    StringTable globalDict;
 
     int numOfWorkingIndexers = numberOfIndexingThreads;
     std::mutex numOfWorkingIndexersMutex;
@@ -108,12 +118,13 @@ int main(int argc, char *argv[]) {
 #ifdef PARALLEL
     std::thread filesEnumThread(findFiles, std::ref(config_file_options->indir), std::ref(paths));
 
-    std::thread filesReadThread(readFiles, std::ref(paths), std::ref(filesContents), maxFileSize, std::ref(timeReadingFinish));
+    std::thread filesReadThread(readFiles, std::ref(paths), std::ref(filesContents), maxFileSize,
+                                std::ref(timeReadingFinish));
 
-    startIndexingThreads(numberOfIndexingThreads, indexingThreads, filesContents, numOfWorkingIndexers,
+    startIndexingThreads(numberOfIndexingThreads, indexingThreads, filesContents, dicts, numOfWorkingIndexers,
                          numOfWorkingIndexersMutex, timeIndexingFinish);
 
-    startMergingThreads(numberOfMergingThreads, mergingThreads, filesDicts, timeMergingFinish);
+    startMergingThreads(numberOfMergingThreads, mergingThreads, globalDict, dicts, timeMergingFinish);
 
     if (filesEnumThread.joinable()) {
         filesEnumThread.join();
@@ -174,8 +185,8 @@ int main(int argc, char *argv[]) {
 
     auto timeWritingStart = get_current_time_fenced();
 
-    // TODO: rewrite function for map
-    writeInFiles(fn, fa, filesDicts.deque());
+    // TODO: rewrite function for StringTable
+    writeInFiles(fn, fa, globalDict);
 
     timeWritingFinish = get_current_time_fenced();
 
@@ -198,12 +209,13 @@ int main(int argc, char *argv[]) {
 }
 
 void
-startIndexingThreads(int numberOfThreads, std::vector<std::thread> &threads, ThreadSafeQueue<ReadFile> &filesContents,
-                     int &numOfWorkingIndexers, std::mutex &numOfWorkingIndexersMutex, TimePoint &timeIndexingFinish) {
+startIndexingThreads(int numberOfThreads, std::vector<std::thread> &threads, BoundedRFQueue &filesContents,
+                     BoundedMapQueue &dicts, int &numOfWorkingIndexers,
+                     std::mutex &numOfWorkingIndexersMutex, TimePoint &timeIndexingFinish) {
     try {
         for (int i = 0; i < numberOfThreads; i++) {
-            // TODO: { mutex.lock() { if numberOfThreads == 1 => dictsQueue.enque(); numberOfThreads--; } }
-            threads.emplace_back(indexFiles, std::ref(filesContents), std::ref(numOfWorkingIndexers),
+            // TODO: create function
+            threads.emplace_back(indexFiles, std::ref(filesContents), std::ref(dicts), std::ref(numOfWorkingIndexers),
                                  std::ref(numOfWorkingIndexersMutex), std::ref(timeIndexingFinish));
         }
     } catch (std::error_code &e) {
@@ -211,13 +223,16 @@ startIndexingThreads(int numberOfThreads, std::vector<std::thread> &threads, Thr
     }
 }
 
-void startMergingThreads(int numberOfThreads, std::vector<std::thread> &threads, ThreadSafeQueue<mapStrInt> &dicts,
+void startMergingThreads(int numberOfThreads, std::vector<std::thread> &threads, StringTable &globalDict, BoundedMapQueue &dicts,
                          TimePoint &timeMergingFinish) {
     try {
         for (int i = 0; i < numberOfThreads; i++) {
-            threads.emplace_back(mergeDicts, std::ref(dicts), std::ref(timeMergingFinish));
+            // TODO: change function signature in cpp and h
+            threads.emplace_back(mergeDicts, std::ref(globalDict), std::ref(dicts), std::ref(timeMergingFinish));
         }
     } catch (std::error_code &e) {
         std::cerr << "Error code " << e << ". Occurred while splitting in threads." << std::endl;
     }
 }
+
+// TODO: merge in one hashmap from all threads. use new queue.

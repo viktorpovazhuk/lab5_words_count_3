@@ -3,9 +3,20 @@
 //
 
 #include "thread_functions.h"
+#include "StringHashCompare.h"
+#include "ReadFile.h"
+
+#include <oneapi/tbb/concurrent_queue.h>
+#include <oneapi/tbb/concurrent_hash_map.h>
+
+namespace fs = std::filesystem;
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
-using mapStrInt = std::map<std::string, int>;
+using MapStrInt = std::map<std::string, int>;
+using BoundedMapQueue = oneapi::tbb::concurrent_bounded_queue<MapStrInt>;
+using BoundedPathQueue = oneapi::tbb::concurrent_bounded_queue<fs::path>;
+using BoundedRFQueue = oneapi::tbb::concurrent_bounded_queue<ReadFile>;
+using StringTable = oneapi::tbb::concurrent_hash_map<std::string, int, StringHashCompare>;
 
 //#define SERIAL
 
@@ -108,44 +119,24 @@ void indexFile(std::vector<std::string> &words, std::string &file) {
 
 }
 
-void mergeDicts(ThreadSafeQueue<mapStrInt> &dictsQueue, TimePoint &timeMergingFinish) {
-    while (true) {
-        mapStrInt dict1 = dictsQueue.deque();
-        while (dict1.empty()) {
-            if (dictsQueue.empty()) {
-                dictsQueue.enque(dict1);
-                timeMergingFinish = get_current_time_fenced();
-                return;
-            } else {
-                dictsQueue.enque(dict1);
-                dict1 = dictsQueue.deque();
-            }
-        }
-        mapStrInt dict2 = dictsQueue.deque();
-        while (dict2.empty()) {
-            if (dictsQueue.empty()) {
-                dictsQueue.enque(dict1);
-                dictsQueue.enque(dict2);
-                timeMergingFinish = get_current_time_fenced();
-                return;
-            } else {
-                dictsQueue.enque(dict2);
-                dict2 = dictsQueue.deque();
-            }
-        }
-
+void mergeDicts(StringTable &globalDict, BoundedMapQueue &dicts, TimePoint &timeMergingFinish) {
+    MapStrInt localDict;
+    dicts.pop(localDict);
+    while (!localDict.empty()) {
         try {
-            for (auto &i: dict1) {
-                if (dict2.find(i.first) != dict2.end()) {
-                    dict2.at(i.first) += i.second;
-                } else {
-                    dict2.insert({i.first, i.second});
-                }
+            StringTable::accessor a;
+            for (auto &i: localDict) {
+                globalDict.insert(a, i.first);
+                a->second += i.second;
+                a.release();
             }
         } catch (std::error_code &e) {
             std::cerr << "Error code " << e << ". Occurred while merging dicts" << std::endl;
         }
-
-        dictsQueue.enque(std::move(dict2));
+        dicts.pop(localDict);
     }
+    MapStrInt emptyDict;
+    dicts.push(std::move(emptyDict));
+
+    timeMergingFinish = get_current_time_fenced();
 }
