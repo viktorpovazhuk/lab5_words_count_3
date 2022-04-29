@@ -214,7 +214,7 @@ startIndexingThreads(int numberOfThreads, std::vector<std::thread> &threads, Bou
                      std::mutex &numOfWorkingIndexersMutex, TimePoint &timeIndexingFinish) {
     try {
         for (int i = 0; i < numberOfThreads; i++) {
-            // TODO: create function
+            // TODO: create function indexFiles
             threads.emplace_back(indexFiles, std::ref(filesContents), std::ref(dicts), std::ref(numOfWorkingIndexers),
                                  std::ref(numOfWorkingIndexersMutex), std::ref(timeIndexingFinish));
         }
@@ -227,12 +227,9 @@ void startMergingThreads(int numberOfThreads, std::vector<std::thread> &threads,
                          TimePoint &timeMergingFinish) {
     try {
         for (int i = 0; i < numberOfThreads; i++) {
-            // TODO: change function signature in cpp and h
             threads.emplace_back(mergeDicts, std::ref(globalDict), std::ref(dicts), std::ref(timeMergingFinish));
         }
     } catch (std::error_code &e) {
         std::cerr << "Error code " << e << ". Occurred while splitting in threads." << std::endl;
     }
 }
-
-// TODO: merge in one hashmap from all threads. use new queue.
