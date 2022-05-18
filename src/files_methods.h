@@ -12,11 +12,11 @@
 #include <filesystem>
 #include <string>
 #include <fstream>
-#include <oneapi/tbb/concurrent_queue.h>
+#include <tbb/concurrent_queue.h>
 
 namespace fs = std::filesystem;
 
-void findFiles(std::string &filesDirectory, oneapi::tbb::concurrent_bounded_queue<fs::path> &paths);
-void readFiles(oneapi::tbb::concurrent_bounded_queue<fs::path> &paths, oneapi::tbb::concurrent_bounded_queue<ReadFile> &filesContents, std::uintmax_t maxFileSize,  std::chrono::time_point<std::chrono::high_resolution_clock> &timeReadingFinish);
+void findFiles(std::string &filesDirectory, tbb::concurrent_bounded_queue<fs::path> &paths);
+void readFiles(tbb::concurrent_bounded_queue<fs::path> &paths, tbb::concurrent_bounded_queue<ReadFile> &filesContents, std::uintmax_t maxFileSize,  std::chrono::time_point<std::chrono::high_resolution_clock> &timeReadingFinish);
 
 #endif //INDEX_FILES_FILES_METHODS_H

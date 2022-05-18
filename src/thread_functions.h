@@ -8,9 +8,11 @@
 #include "time_measurement.h"
 #include "StringHashCompare.h"
 #include "thread_safe_queue.h"
+#include "ReadFile.h"
+#include "boost/locale.hpp"
 
-#include <oneapi/tbb/concurrent_queue.h>
-#include <oneapi/tbb/concurrent_hash_map.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/concurrent_hash_map.h>
 
 #include <iostream>
 #include <filesystem>
@@ -23,13 +25,15 @@
 #include <fstream>
 #include <algorithm>
 #include <locale>
+#include <archive.h>
+#include <archive_entry.h>
 
 
 
-void overworkFile(ThreadSafeQueue<std::string> &filesContents, std::unordered_map<std::string, int>& dict, std::mutex &mut, std::chrono::time_point<std::chrono::high_resolution_clock> &timeFindingFinish);
 
-void indexFile(std::vector <std::string> &words, std::string& file);
+void overworkFile(tbb::concurrent_bounded_queue<ReadFile> &filesContents, int &numOfWorkingIndexers, std::mutex& numOfWorkingIndexersMutex, tbb::concurrent_bounded_queue<std::map<std::basic_string<char>, int>> &dict,
+                  std::chrono::time_point<std::chrono::high_resolution_clock> &timeFindingFinish);
 
-void mergeDicts(oneapi::tbb::concurrent_hash_map<std::string, int, StringHashCompare> &globalDict, oneapi::tbb::concurrent_bounded_queue<std::map<std::string, int>> &dicts, std::chrono::time_point<std::chrono::high_resolution_clock> &timeMergingFinish);
+void mergeDicts(tbb::concurrent_hash_map<std::string, int, StringHashCompare> &globalDict, tbb::concurrent_bounded_queue<std::map<std::string, int>> &dicts, std::chrono::time_point<std::chrono::high_resolution_clock> &timeMergingFinish);
 
 #endif //SERIAL_THREAD_FUNCTIONS_H

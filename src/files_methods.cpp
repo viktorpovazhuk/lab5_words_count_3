@@ -5,11 +5,11 @@
 #include "files_methods.h"
 #include "ReadFile.h"
 
-#include <oneapi/tbb/concurrent_queue.h>
+#include <tbb/concurrent_queue.h>
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
-using BoundedPathQueue = oneapi::tbb::concurrent_bounded_queue<fs::path>;
-using BoundedRFQueue = oneapi::tbb::concurrent_bounded_queue<ReadFile>;
+using BoundedPathQueue = tbb::concurrent_bounded_queue<fs::path>;
+using BoundedRFQueue = tbb::concurrent_bounded_queue<ReadFile>;
 
 void findFiles(std::string &filesDirectory, BoundedPathQueue &paths) {
     for (const auto &dir_entry: fs::recursive_directory_iterator(filesDirectory)) {

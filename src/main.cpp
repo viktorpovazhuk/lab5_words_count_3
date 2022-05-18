@@ -11,9 +11,8 @@
 #include <iostream>
 #include <filesystem>
 #include <string>
-#include <fstream>
-#include <oneapi/tbb/concurrent_queue.h>
-#include <oneapi/tbb/concurrent_hash_map.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/concurrent_hash_map.h>
 
 namespace fs = std::filesystem;
 
@@ -24,10 +23,10 @@ using std::endl;
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 using MapStrInt = std::map<std::string, int>;
-using BoundedPathQueue = oneapi::tbb::concurrent_bounded_queue<fs::path>;
-using BoundedRFQueue = oneapi::tbb::concurrent_bounded_queue<ReadFile>;
-using BoundedMapQueue = oneapi::tbb::concurrent_bounded_queue<MapStrInt>;
-using StringTable = oneapi::tbb::concurrent_hash_map<string, int, StringHashCompare>;
+using BoundedPathQueue = tbb::concurrent_bounded_queue<fs::path>;
+using BoundedRFQueue = tbb::concurrent_bounded_queue<ReadFile>;
+using BoundedMapQueue = tbb::concurrent_bounded_queue<MapStrInt>;
+using StringTable = tbb::concurrent_hash_map<string, int, StringHashCompare>;
 
 //#define PRINT_CONTENT
 #define PARALLEL
@@ -218,8 +217,8 @@ startIndexingThreads(int numberOfThreads, std::vector<std::thread> &threads, Bou
     try {
         for (int i = 0; i < numberOfThreads; i++) {
             // TODO: create function indexFiles
-            threads.emplace_back(indexFiles, std::ref(filesContents), std::ref(dicts), std::ref(numOfWorkingIndexers),
-                                 std::ref(numOfWorkingIndexersMutex), std::ref(timeIndexingFinish));
+            threads.emplace_back(overworkFile, std::ref(filesContents), std::ref(numOfWorkingIndexers),
+                                 std::ref(numOfWorkingIndexersMutex), std::ref(dicts), std::ref(timeIndexingFinish));
         }
     } catch (std::error_code &e) {
         std::cerr << "Error code " << e << ". Occurred while splitting in threads." << std::endl;
