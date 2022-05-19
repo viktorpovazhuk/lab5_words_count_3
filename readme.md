@@ -62,7 +62,7 @@ Example of script run:
 
 ```shell
 [user@pc .]$ cd bin
-[user@pc bin]$ python ../scripts/script.py
+[user@pc bin]$ python ../scripts/main_pr.py
 ```
 
 ### Important!
