@@ -94,7 +94,7 @@ void overworkFile(tbb::concurrent_bounded_queue<ReadFile> &filesContents, int &n
                     filesContents.push(std::move(readFile));
                 }
             }
-        } else {
+        } else if (file.extension == ".txt"){
             try {
                 file.content = boost::locale::normalize(file.content);
                 file.content = boost::locale::fold_case(file.content);

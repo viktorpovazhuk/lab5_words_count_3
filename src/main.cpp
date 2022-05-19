@@ -43,7 +43,7 @@ void startMergingThreads(int numberOfThreads, std::vector<std::thread> &threads,
 int main(int argc, char *argv[]) {
     string configFilename;
     if (argc < 2) {
-        configFilename = "index.cfg";
+        configFilename = "../configs/index.cfg";
     } else {
         std::unique_ptr<command_line_options_t> command_line_options;
         try {
@@ -94,6 +94,9 @@ int main(int argc, char *argv[]) {
         MyFile.close();
     }
 
+    boost::locale::generator gen;
+    std::locale::global(gen("en_US.UTF-8"));
+
     auto timeStart = get_current_time_fenced();
     TimePoint timeIndexingFinish, timeMergingFinish, timeReadingFinish, timeWritingFinish;
 
@@ -139,7 +142,7 @@ int main(int argc, char *argv[]) {
                 thread.join();
             }
         }
-        for (auto &thread: indexingThreads) {
+        for (auto &thread: mergingThreads) {
             if (thread.joinable()) {
                 thread.join();
             }
@@ -205,7 +208,7 @@ int main(int argc, char *argv[]) {
     else {
         std::cout << "Finding=" << timeIndexing << "\n";
     }
-    std::cout << "Writing=" << timeWriting;
+    std::cout << "Writing=" << timeWriting << endl;
 
     return 0;
 }

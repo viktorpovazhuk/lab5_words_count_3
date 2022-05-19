@@ -74,16 +74,16 @@ add_executable(${PROJECT_NAME} src/main.cpp
 
 #! Add external packages
 # options_parser requires boost::program_options library
-find_package(Boost 1.71.0 COMPONENTS program_options system REQUIRED)
+find_package(Boost 1.71.0 COMPONENTS program_options system locale REQUIRED)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${Boost_INCLUDE_DIR})
-target_link_libraries(${PROJECT_NAME} Boost::program_options Boost::system)
+target_link_libraries(${PROJECT_NAME} Boost::program_options Boost::system Boost::locale)
 
 #target_include_directories(${TEST_EXECUTABLE} PRIVATE ${Boost_INCLUDE_DIR})
 #target_link_libraries(${TEST_EXECUTABLE} Boost::program_options Boost::system)
 
 find_package(LibArchive REQUIRED)
-target_link_libraries(${PROJECT_NAME} Boost::program_options Boost::system Boost::locale)
+target_include_directories(${PROJECT_NAME} PRIVATE ${LibArchive_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} ${LibArchive_LIBRARIES})
 
 

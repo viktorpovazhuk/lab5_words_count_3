@@ -34,17 +34,17 @@ void readFiles(BoundedPathQueue &paths, BoundedRFQueue &filesContents, std::uint
             std::string content{(std::istreambuf_iterator<char>(ifs)),
                            (std::istreambuf_iterator<char>())};
             readFile.content = std::move(content);
+            readFile.extension = path.extension();
+            readFile.filename = path.filename();
+            filesContents.push(std::move(readFile));
         }
         else if (path.extension() == ".zip") {
-            std::ifstream raw_file(path, std::ios::binary);
-            std::ostringstream buffer_ss;
-            buffer_ss << raw_file.rdbuf();
-            std::string content{buffer_ss.str()};
-            readFile.content = std::move(content);
+            readFile.content = path;
+            readFile.extension = path.extension();
+            readFile.filename = path.filename();
+            filesContents.push(std::move(readFile));
         }
-        readFile.extension = path.extension();
-        readFile.filename = path.filename();
-        filesContents.push(std::move(readFile));
+
         paths.pop(path);
     }
     ReadFile emptyReadFile;
